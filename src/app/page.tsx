@@ -29,6 +29,9 @@ interface AudioInputDevice {
 }
 
 export default function RecordingApp() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState('');
+  
   const [state, setState] = useState<RecordingState>({
     isRecording: false,
     audioBlob: null,
@@ -286,6 +289,14 @@ export default function RecordingApp() {
     }
   };
 
+  const handleLogin = () => {
+    if (password === 'wordio2024') {
+      setIsAuthenticated(true);
+    } else {
+      alert('Wrong password');
+    }
+  };
+
   const clearAll = () => {
     stopAudioMonitoring();
     setState({
@@ -302,6 +313,32 @@ export default function RecordingApp() {
     setTranscriptionHistory([]); // Clear all history
   };
 
+
+  // Password protection screen
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 max-w-md w-full mx-4">
+          <h1 className="text-2xl font-bold mb-4 text-center">Word-IO</h1>
+          <p className="text-gray-600 mb-4 text-center">Enter password to access:</p>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+            className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Enter password"
+          />
+          <button
+            onClick={handleLogin}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            Access App
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
