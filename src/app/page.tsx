@@ -212,7 +212,7 @@ Format lists properly:
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'recording.wav');
-      // formData.append('language', 'auto'); // Hardcoded to Chinese Simplified
+      formData.append('language', 'auto');
 
       const response = await fetch('/api/transcribe', {
         method: 'POST',
