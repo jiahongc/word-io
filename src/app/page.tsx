@@ -60,6 +60,7 @@ Format lists properly:
 
   const [audioInputs, setAudioInputs] = useState<AudioInputDevice[]>([]);
   const [transcriptionHistory, setTranscriptionHistory] = useState<TranscriptionHistory[]>([]);
+  const [autoEnhance, setAutoEnhance] = useState<boolean>(true); // Default to enabled
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -230,10 +231,15 @@ Format lists properly:
       const historyItem: TranscriptionHistory = {
         id: Date.now().toString(),
         transcript: transcript,
-        correctedText: '', // Will be updated if user clicks enhance
+        correctedText: '', // Will be updated if auto-enhance is enabled
         timestamp: new Date(),
       };
       setTranscriptionHistory(prev => [historyItem, ...prev]);
+      
+      // Automatically enhance the transcript if toggle is enabled
+      if (autoEnhance) {
+        await enhanceTranscript(transcript);
+      }
     } catch (error) {
       console.error('Error transcribing audio:', error);
       alert('Failed to transcribe audio. Please check your API key.');
@@ -241,8 +247,8 @@ Format lists properly:
     }
   };
 
-  const correctGrammar = async () => {
-    if (!state.transcript.trim()) return;
+  const enhanceTranscript = async (text: string) => {
+    if (!text.trim()) return;
 
     setState(prev => ({ ...prev, isProcessing: true }));
 
@@ -253,23 +259,23 @@ Format lists properly:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          text: state.transcript,
+          text: text,
           customPrompt: customPrompt 
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to correct grammar');
+        throw new Error('Failed to enhance text');
       }
 
       const { correctedText } = await response.json();
       setState(prev => ({ ...prev, correctedText, isProcessing: false }));
       
-      // Update the most recent history item with corrected text
+      // Update the most recent history item with enhanced text
       setTranscriptionHistory(prev => {
         const newHistory = [...prev];
         if (newHistory.length > 0) {
-          // Update the most recent item (index 0) with corrected text
+          // Update the most recent item (index 0) with enhanced text
           newHistory[0] = {
             ...newHistory[0],
             correctedText: correctedText
@@ -278,11 +284,12 @@ Format lists properly:
         return newHistory;
       });
     } catch (error) {
-      console.error('Error correcting grammar:', error);
-      alert('Failed to correct grammar. Please check your API key.');
+      console.error('Error enhancing text:', error);
+      alert('Failed to enhance text. Please check your API key.');
       setState(prev => ({ ...prev, isProcessing: false }));
     }
   };
+
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -407,6 +414,25 @@ Format lists properly:
                   <span>Save Prompt</span>
                 </button>
               </div>
+              
+              {/* Auto-Enhance Toggle */}
+              <div className="mb-6">
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoEnhance}
+                    onChange={(e) => setAutoEnhance(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Auto-enhance after recording (GPT-5 nano)
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 ml-7">
+                  When enabled, text will be automatically enhanced after transcription. When disabled, you can manually enhance using the button.
+                </p>
+              </div>
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Custom AI Prompt (System Message)
@@ -469,22 +495,42 @@ Format lists properly:
             )}
           </div>
 
-          {/* Big Copy Button - Right below recording controls */}
+          {/* Copy Buttons - Right below recording controls */}
           {(state.transcript || state.correctedText) && (
-            <div className="flex justify-center mb-8">
-              <button
-                onClick={() => copyToClipboard(state.correctedText || state.transcript)}
-                className="flex items-center space-x-3 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg font-medium transition-colors text-lg"
-              >
-                {state.copiedText === (state.correctedText || state.transcript) ? (
-                  <Check className="w-6 h-6" />
-                ) : (
-                  <Copy className="w-6 h-6" />
-                )}
-                <span>
-                  {state.copiedText === (state.correctedText || state.transcript) ? 'Copied!' : 'Copy Text'}
-                </span>
-              </button>
+            <div className="flex justify-center space-x-4 mb-8">
+              {/* Copy Original Button */}
+              {state.transcript && (
+                <button
+                  onClick={() => copyToClipboard(state.transcript)}
+                  className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                >
+                  {state.copiedText === state.transcript ? (
+                    <Check className="w-5 h-5" />
+                  ) : (
+                    <Copy className="w-5 h-5" />
+                  )}
+                  <span>
+                    {state.copiedText === state.transcript ? 'Copied!' : 'Copy Original'}
+                  </span>
+                </button>
+              )}
+              
+              {/* Copy Enhanced Button */}
+              {state.correctedText && (
+                <button
+                  onClick={() => copyToClipboard(state.correctedText)}
+                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                >
+                  {state.copiedText === state.correctedText ? (
+                    <Check className="w-5 h-5" />
+                  ) : (
+                    <Copy className="w-5 h-5" />
+                  )}
+                  <span>
+                    {state.copiedText === state.correctedText ? 'Copied!' : 'Copy Enhanced'}
+                  </span>
+                </button>
+              )}
             </div>
           )}
 
@@ -554,49 +600,58 @@ Format lists properly:
             </div>
           )}
 
-          {/* Transcript Section */}
-          <div className="space-y-6">
+          {/* Transcript Section - Side by Side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Original Transcript */}
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wide">Transcript</h3>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={correctGrammar}
-                    disabled={!state.transcript.trim() || state.isProcessing}
-                    className="flex items-center space-x-1 bg-gray-800 hover:bg-gray-900 disabled:bg-gray-300 text-white px-3 py-2 rounded text-sm font-medium transition-colors"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    <span>{state.isProcessing ? 'Processing...' : 'Enhance'}</span>
-                  </button>
+              <div className="mb-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wide">Original Transcript</h3>
+                  {!autoEnhance && state.transcript && !state.isProcessing && (
+                    <button
+                      onClick={() => enhanceTranscript(state.transcript)}
+                      className="flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Enhance</span>
+                    </button>
+                  )}
                 </div>
+                {state.isProcessing && (
+                  <div className="text-xs text-blue-600 mt-1 flex items-center space-x-1">
+                    <Sparkles className="w-3 h-3 animate-spin" />
+                    <span>Enhancing with AI...</span>
+                  </div>
+                )}
               </div>
               <textarea
                 value={state.transcript}
                 onChange={(e) => setState(prev => ({ ...prev, transcript: e.target.value }))}
                 placeholder="Your speech will be transcribed here automatically after recording..."
-                className="w-full h-32 p-4 border border-gray-200 rounded-lg resize-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 text-sm"
+                className="w-full h-64 p-4 border border-gray-200 rounded-lg resize-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 text-sm"
               />
             </div>
 
-            {/* Corrected Text Section */}
-            {state.correctedText && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wide">Enhanced Text</h3>
-                  <button
-                    onClick={clearAll}
-                    className="flex items-center space-x-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs font-medium transition-colors border border-gray-200"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    <span>Clear All</span>
-                  </button>
-                </div>
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                  <p className="text-gray-800 whitespace-pre-wrap text-sm">{state.correctedText}</p>
-                </div>
+            {/* Enhanced Text */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wide">Enhanced Text (GPT-5 nano)</h3>
+                <button
+                  onClick={clearAll}
+                  className="flex items-center space-x-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs font-medium transition-colors border border-gray-200"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Clear All</span>
+                </button>
               </div>
-            )}
-
+              <div className="h-64 p-4 bg-gray-50 border border-gray-200 rounded-lg overflow-y-auto">
+                {state.correctedText ? (
+                  <p className="text-gray-800 whitespace-pre-wrap text-sm">{state.correctedText}</p>
+                ) : (
+                  <p className="text-gray-500 text-sm italic">Enhanced text will appear here after recording...</p>
+                )}
+              </div>
+            </div>
           </div>
 
 
@@ -611,29 +666,46 @@ Format lists properly:
                       <span className="text-xs text-gray-500">
                         {item.timestamp.toLocaleString()}
                       </span>
-                      <button
-                        onClick={() => copyHistoryItem(item.correctedText || item.transcript, item.id)}
-                        className="flex items-center space-x-1 text-gray-600 hover:text-gray-800 transition-colors"
-                      >
-                        {state.copiedText === `history-${item.id}` ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <Copy className="w-4 h-4" />
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => copyHistoryItem(item.transcript, `history-original-${item.id}`)}
+                          className="flex items-center space-x-1 text-gray-600 hover:text-gray-800 transition-colors"
+                        >
+                          {state.copiedText === `history-original-${item.id}` ? (
+                            <Check className="w-4 h-4" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                          <span className="text-xs">
+                            {state.copiedText === `history-original-${item.id}` ? 'Copied!' : 'Copy Original'}
+                          </span>
+                        </button>
+                        {item.correctedText && (
+                          <button
+                            onClick={() => copyHistoryItem(item.correctedText, `history-enhanced-${item.id}`)}
+                            className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 transition-colors"
+                          >
+                            {state.copiedText === `history-enhanced-${item.id}` ? (
+                              <Check className="w-4 h-4" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
+                            <span className="text-xs">
+                              {state.copiedText === `history-enhanced-${item.id}` ? 'Copied!' : 'Copy Enhanced'}
+                            </span>
+                          </button>
                         )}
-                        <span className="text-xs">
-                          {state.copiedText === `history-${item.id}` ? 'Copied!' : 'Copy'}
-                        </span>
-                      </button>
+                      </div>
                     </div>
-                    <div className="space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs font-medium text-gray-600 mb-1">Original:</p>
-                        <p className="text-sm text-gray-700">{item.transcript}</p>
+                        <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded border">{item.transcript}</p>
                       </div>
                       {item.correctedText && (
                         <div>
                           <p className="text-xs font-medium text-gray-600 mb-1">Enhanced:</p>
-                          <p className="text-sm text-gray-800 font-medium">{item.correctedText}</p>
+                          <p className="text-sm text-gray-800 font-medium bg-blue-50 p-2 rounded border border-blue-200">{item.correctedText}</p>
                         </div>
                       )}
                     </div>
