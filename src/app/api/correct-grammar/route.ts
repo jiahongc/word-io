@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     const systemPrompt = customPrompt || 'You are a helpful assistant that corrects grammar and improves the flow of text. ONLY work with English and Chinese Simplified text. Your tasks:\n\n1. Fix basic grammar, punctuation, and sentence structure\n2. Convert spoken lists into proper numbered lists or bullet points when you detect list structures\n3. Improve sentence formatting and structure for better readability\n4. Preserve the original meaning and language mix\n5. Do not add unnecessary words or translate between languages\n6. If the text contains any other languages besides English or Chinese Simplified, leave it unchanged\n\nFormat lists properly:\n- Use numbered lists (1., 2., 3.) for sequential items\n- Use bullet points (- or •) for non-sequential items\n- Ensure proper indentation and spacing';
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5-nano',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
