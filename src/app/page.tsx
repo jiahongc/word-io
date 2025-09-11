@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Trash2, Sparkles, ChevronDown, Volume2, Copy, Check } from 'lucide-react';
+import { Mic, Square, Trash2, Sparkles, ChevronDown, Volume2, Copy, Check, Settings, Save } from 'lucide-react';
 
 interface RecordingState {
   isRecording: boolean;
@@ -31,6 +31,20 @@ interface AudioInputDevice {
 export default function RecordingApp() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState(`You are a helpful assistant that corrects grammar and improves the flow of text. ONLY work with English and Chinese Simplified text. Your tasks:
+
+1. Fix basic grammar, punctuation, and sentence structure
+2. Convert spoken lists into proper numbered lists or bullet points when you detect list structures
+3. Improve sentence formatting and structure for better readability
+4. Preserve the original meaning and language mix
+5. Do not add unnecessary words or translate between languages
+6. If the text contains any other languages besides English or Chinese Simplified, leave it unchanged
+
+Format lists properly:
+- Use numbered lists (1., 2., 3.) for sequential items
+- Use bullet points (- or •) for non-sequential items
+- Ensure proper indentation and spacing`);
   
   const [state, setState] = useState<RecordingState>({
     isRecording: false,
@@ -123,6 +137,11 @@ export default function RecordingApp() {
 
   useEffect(() => {
     getAudioInputs();
+    // Load saved custom prompt from localStorage
+    const savedPrompt = localStorage.getItem('wordio-custom-prompt');
+    if (savedPrompt) {
+      setCustomPrompt(savedPrompt);
+    }
     return () => {
       stopAudioMonitoring();
     };
@@ -233,7 +252,10 @@ export default function RecordingApp() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text: state.transcript }),
+        body: JSON.stringify({ 
+          text: state.transcript,
+          customPrompt: customPrompt 
+        }),
       });
 
       if (!response.ok) {
@@ -297,6 +319,13 @@ export default function RecordingApp() {
     }
   };
 
+  const saveCustomPrompt = () => {
+    // Save to localStorage for persistence
+    localStorage.setItem('wordio-custom-prompt', customPrompt);
+    setShowSettings(false);
+    alert('Custom prompt saved! It will be used for future enhancements.');
+  };
+
   const clearAll = () => {
     stopAudioMonitoring();
     setState({
@@ -345,13 +374,56 @@ export default function RecordingApp() {
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-light text-gray-900 mb-2">
-              Word-IO
-            </h1>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex-1"></div>
+              <h1 className="text-3xl font-light text-gray-900">
+                Word-IO
+              </h1>
+              <div className="flex-1 flex justify-end">
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="flex items-center space-x-1 text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  <Settings className="w-5 h-5" />
+                  <span className="text-sm">Settings</span>
+                </button>
+              </div>
+            </div>
             <p className="text-gray-600 text-sm">
               Multilingual Voice Recording with AI Enhancement
             </p>
           </div>
+
+          {/* Settings Panel */}
+          {showSettings && (
+            <div className="mb-8 p-6 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">AI Enhancement Settings</h3>
+                <button
+                  onClick={saveCustomPrompt}
+                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Prompt</span>
+                </button>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Custom AI Prompt (System Message)
+                </label>
+                <textarea
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  className="w-full h-48 p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
+                  placeholder="Enter your custom AI prompt here..."
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  This prompt will be used to instruct the AI on how to enhance your transcribed text. 
+                  You can customize the behavior, language preferences, formatting rules, etc.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Voice Input Selection */}
           <div className="flex justify-center mb-6">
