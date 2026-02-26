@@ -66,6 +66,7 @@ Format lists properly:
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const isRecordingRef = useRef<boolean>(false);
 
 
   // Get available audio input devices
@@ -103,14 +104,13 @@ Format lists properly:
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       
       const updateAudioLevel = () => {
-        if (analyserRef.current && state.isRecording) {
+        if (analyserRef.current && isRecordingRef.current) {
           analyserRef.current.getByteFrequencyData(dataArray);
           // Get the average of the first 8 frequency bins (voice range)
           const relevantData = dataArray.slice(0, 8);
           const average = relevantData.reduce((a, b) => a + b) / relevantData.length;
           // Scale the audio level to be more responsive to voice
           const scaledLevel = Math.min(255, average * 4);
-          console.log('Audio level:', scaledLevel, 'Average:', average);
           setState(prev => ({ ...prev, audioLevel: scaledLevel }));
           animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
         }
@@ -162,6 +162,7 @@ Format lists properly:
       audioChunksRef.current = [];
 
       // Start audio level monitoring for animation
+      isRecordingRef.current = true;
       monitorAudioLevel(stream);
 
       mediaRecorder.ondataavailable = (event) => {
@@ -195,11 +196,12 @@ Format lists properly:
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && state.isRecording) {
+      isRecordingRef.current = false;
       mediaRecorderRef.current.stop();
-      
+
       // Stop all audio tracks
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-      
+
       // Stop audio monitoring
       stopAudioMonitoring();
       
@@ -307,8 +309,7 @@ Format lists properly:
   const copyHistoryItem = async (text: string, itemId: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      // Show feedback for history item copy
-      setState(prev => ({ ...prev, copiedText: `history-${itemId}` }));
+      setState(prev => ({ ...prev, copiedText: itemId }));
       setTimeout(() => {
         setState(prev => ({ ...prev, copiedText: null }));
       }, 2000);
@@ -361,7 +362,7 @@ Format lists properly:
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
             className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="Enter password"
           />
@@ -581,10 +582,6 @@ Format lists properly:
                       })}
                     </div>
                     <Volume2 className="w-5 h-5 text-blue-500 animate-pulse" />
-                    {/* Debug: Show audio level */}
-                    <div className="text-xs text-gray-500 ml-2">
-                      Level: {Math.round(state.audioLevel)}
-                    </div>
                   </div>
                 ) : (
                   <div className="flex items-center space-x-1">
